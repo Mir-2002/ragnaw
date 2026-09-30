@@ -1,0 +1,19 @@
+{
+  "schema_version": 1,
+  "embedding_model": "sentence-transformers/all-MiniLM-L6-v2",
+  "embedding_dim": 384,
+  "max_chunk_tokens": 128,
+  "documents": 4099,
+  "documents_by_kind": {
+    "species": 2759,
+    "move": 996,
+    "ability": 344
+  },
+  "files": {
+    "db": "ragnaw.sqlite",
+    "documents": "documents.json",
+    "embeddings": "embeddings.npy"
+  },
+  "pokeapi_sha": "89289e314ae20a34e8159a34a5fe646e656d6149",
+  "built_at": "2026-09-29T16:45:10+00:00"
+}
