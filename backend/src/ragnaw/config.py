@@ -1,0 +1,63 @@
+from dataclasses import dataclass
+from functools import lru_cache
+from pathlib import Path
+
+from pydantic_settings import BaseSettings, SettingsConfigDict
+
+# backend/data, where ingest writes the SQLite DB, vector index and manifest.
+DEFAULT_DATA_DIR = Path(__file__).resolve().parents[2] / "data"
+
+
+@dataclass(frozen=True)
+class LLMProvider:
+    name: str
+    base_url: str
+    api_key: str
+    model: str
+
+
+class Settings(BaseSettings):
+    model_config = SettingsConfigDict(env_file=".env", extra="ignore")
+
+    # Providers retire models often; override via env instead of editing code.
+    groq_api_key: str = ""
+    groq_model: str = "openai/gpt-oss-120b"
+    gemini_api_key: str = ""
+    gemini_model: str = "gemini-3.8-flash"
+
+    # Comma-separated so it can be set as a plain HF Space variable.
+    cors_origins: str = "http://localhost:3000"
+
+    max_question_chars: int = 500
+    max_tool_rounds: int = 3
+
+    data_dir: Path = DEFAULT_DATA_DIR
+
+    @property
+    def cors_origin_list(self) -> list[str]:
+        return [o.strip() for o in self.cors_origins.split(",") if o.strip()]
+
+    @property
+    def llm_providers(self) -> list[LLMProvider]:
+        """Configured providers in fallback order: the next is tried when one returns 429.
+
+        Groq goes first for speed (8K tokens/min on the free plan); Gemini Flash has far more
+        token headroom. Both are called through their OpenAI-compatible APIs.
+        """
+        candidates = [
+            LLMProvider(
+                "groq", "https://api.groq.com/openai/v1", self.groq_api_key, self.groq_model
+            ),
+            LLMProvider(
+                "gemini",
+                "https://generativelanguage.googleapis.com/v1beta/openai/",
+                self.gemini_api_key,
+                self.gemini_model,
+            ),
+        ]
+        return [p for p in candidates if p.api_key]
+
+
+@lru_cache
+def get_settings() -> Settings:
+    return Settings()

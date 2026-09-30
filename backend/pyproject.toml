@@ -1,0 +1,31 @@
+[project]
+name = "ragnaw-backend"
+version = "0.1.0"
+description = "RAGNaw API: retrieval + tool calling over PokeAPI data"
+readme = "README.md"
+authors = [
+    { name = "Ahmer Macasindel", email = "ahmer@edusuite.asia" }
+]
+requires-python = ">=3.12"
+dependencies = [
+    "fastapi>=0.115",
+    "pydantic-settings>=2.6",
+    "uvicorn[standard]>=0.32",
+]
+
+[dependency-groups]
+dev = [
+    "httpx2>=2.13",
+    "pytest>=8.3",
+    "ruff>=0.8",
+]
+
+[build-system]
+requires = ["uv_build>=0.12.20,<0.13.0"]
+build-backend = "uv_build"
+
+[tool.uv.build-backend]
+module-name = "ragnaw"
+
+[tool.ruff]
+line-length = 100
