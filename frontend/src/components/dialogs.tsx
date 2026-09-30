@@ -1,6 +1,7 @@
 "use client";
 
 import { Dialog } from "@base-ui/react/dialog";
+import Image from "next/image";
 import { useTheme } from "next-themes";
 import { useRef } from "react";
 import { Frame } from "@/components/retro";
@@ -118,15 +119,30 @@ export function OptionDialog(props: DialogProps) {
 
 export function AboutDialog(props: DialogProps) {
   return (
-    <Shell {...props} title="About RAGNaw">
+    <Shell {...props} title="About">
       <div className="flex flex-col gap-3 leading-snug">
         <p>
-          RAGNaw answers Pokémon questions from a snapshot of PokeAPI’s data: stats, types,
-          matchups, evolutions, moves, abilities and Pokédex entries, as of the latest games.
+          {/* 14px = 2 units of the logo's 7-step pixel grid, so it stays crisp inline. */}
+          <Image
+            src="/ragnaw-wordmark.svg"
+            alt="RAGNaw"
+            width={1316}
+            height={196}
+            unoptimized
+            className="px-logo mr-1 inline-block h-[14px] w-auto align-[-1px]"
+          />{" "}
+          is a retrieval-augmented question answerer for Pokémon, built on a SQLite database
+          made from PokeAPI’s data, as of the latest games.
         </p>
         <p>
-          For each question, an LLM looks things up with a set of tools and search, then writes
-          the answer from what it found. The sources under each answer show what it used.
+          Each question goes to an LLM (Groq’s gpt-oss and Qwen, falling back to Gemini
+          Flash-Lite) that calls tools to look up real data: stats, types, matchups,
+          evolutions, moves and abilities. For lore, it searches Pokédex entries with hybrid
+          retrieval, combining MiniLM embeddings with BM25 keyword search.
+        </p>
+        <p>
+          Answers are written only from what those lookups return, and the sources under each
+          answer show what was used.
         </p>
         <p className="text-[var(--ink-soft)]">
           Unofficial fan project. Pokémon © Nintendo, Game Freak, Creatures. Data and sprites
