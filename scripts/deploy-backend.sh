@@ -24,5 +24,6 @@ $UVX --from huggingface_hub hf upload "$HF_SPACE" . . --repo-type=space \
   --exclude "*__pycache__*" \
   --exclude ".pytest_cache/*" \
   --exclude ".ruff_cache/*" \
+  --exclude ".cache/*" \
   --exclude "tests/*" \
   --commit-message "Deploy $(git rev-parse --short HEAD 2>/dev/null || echo local)"
