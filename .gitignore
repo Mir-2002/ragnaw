@@ -22,3 +22,6 @@ Thumbs.db
 
 # Partial build output
 *.tmp
+
+# Session notes, kept local
+HANDOFF.md
