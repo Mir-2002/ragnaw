@@ -25,6 +25,9 @@ ENV HF_HUB_OFFLINE=1
 COPY --chown=user . .
 RUN uv sync --frozen --no-dev
 
+# Hosts assign the port through PORT (Render defaults it to 10000); 7860 otherwise.
+ENV PORT=7860
 EXPOSE 7860
-# --proxy-headers so request.client is the visitor's IP behind HF's proxy (needed for rate limiting).
-CMD ["uvicorn", "ragnaw.main:app", "--host", "0.0.0.0", "--port", "7860", "--proxy-headers", "--forwarded-allow-ips", "*"]
+# --proxy-headers so request.client is the visitor's IP behind the host's proxy (needed
+# for rate limiting). exec keeps uvicorn as PID 1 so it receives shutdown signals.
+CMD ["sh", "-c", "exec uvicorn ragnaw.main:app --host 0.0.0.0 --port \"$PORT\" --proxy-headers --forwarded-allow-ips '*'"]

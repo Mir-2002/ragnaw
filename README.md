@@ -7,7 +7,7 @@ or "what beats Water/Ground?" are computed rather than guessed.
 | Directory | What | Deployed to |
 |---|---|---|
 | `frontend/` | Next.js (App Router, Tailwind) | Vercel (root directory: `frontend`) |
-| `backend/` | FastAPI, serves `/health` and (soon) `/chat` over SSE | Hugging Face Space (Docker) |
+| `backend/` | FastAPI: `/health`, and `/chat` over SSE | Render (Docker, free) |
 | `ingest/` | Offline pipeline: PokeAPI CSVs → `backend/data/` | Runs locally, never deployed |
 
 ## Local development
@@ -27,26 +27,32 @@ cd frontend && pnpm install && cp .env.example .env.local && pnpm dev
 
 ## Deployment
 
-**Backend (HF Space).** `backend/` is uploaded as the Space's repo root with the `hf` CLI,
-which stores the binary files in `backend/data/` through Xet (a plain git push to the Space
-rejects them):
+Both services deploy from this GitHub repo.
 
-```sh
-uvx --from huggingface_hub hf auth login     # once
-HF_SPACE=<user>/ragnaw sh scripts/deploy-backend.sh
-```
+**Backend (Render, free web service).** New → Web Service → this repo, then:
 
-The upload doesn't delete files on the Space, so remove renamed or deleted files there
-by hand.
+| Setting | Value |
+|---|---|
+| Language | Docker |
+| Root Directory | `backend` (only changes under it trigger deploys) |
+| Dockerfile Path | `Dockerfile` (relative to the root directory) |
+| Instance Type | Free |
+| Health Check Path | `/health` |
+| Environment | `GROQ_API_KEY`, `GEMINI_API_KEY` (secrets); `CORS_ORIGINS` = the Vercel URL |
 
-Set `GROQ_API_KEY` and `GEMINI_API_KEY` as Space secrets and `CORS_ORIGINS` to the Vercel URL.
+The container binds to `$PORT`, which Render sets. It needs about 233 MB of RAM at peak.
 
 **Frontend (Vercel).** Import the repo with root directory `frontend` and set
-`NEXT_PUBLIC_API_URL` to `https://<user>-ragnaw.hf.space`.
+`NEXT_PUBLIC_API_URL` to the Render URL (e.g. `https://ragnaw-backend.onrender.com`).
+It's inlined at build time, so changing it needs a redeploy.
 
-**Keep-alive.** Free Spaces sleep after ~48h without traffic. A monitor pinging
-`https://<user>-ragnaw.hf.space/health` once a day is enough (GET and HEAD both work).
-Rebuilds and restarts still cause cold starts; the UI shows a waking state for those.
+**Cold starts.** Free Render services spin down after 15 minutes without traffic and take
+about a minute to wake; the UI shows a waking state meanwhile. A monitor pinging `/health`
+more often than every 15 minutes keeps it awake. One service running all month (~744 h)
+fits Render's 750 free hours per workspace.
+
+Hugging Face Spaces was the original target, but Docker and Gradio Spaces now need a paid
+plan; `scripts/deploy-backend.sh` still works for a PRO account.
 
 ---
 
