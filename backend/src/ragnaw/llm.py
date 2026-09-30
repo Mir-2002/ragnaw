@@ -60,6 +60,12 @@ class Turn:
     provider: str
     content: str
     tool_calls: list[ToolCall]
+    # None means the stream ended without one: Gemini sometimes cuts streams short.
+    finish_reason: str | None = None
+
+    @property
+    def truncated(self) -> bool:
+        return self.finish_reason in (None, "length")
 
 
 @dataclass
@@ -124,13 +130,17 @@ class LLMRouter:
                 }
                 if provider.reasoning_effort:
                     params["reasoning_effort"] = provider.reasoning_effort
+                if provider.extra_body:
+                    params["extra_body"] = provider.extra_body
                 stream = await self.clients[provider.name].chat.completions.create(**params)
 
                 content: list[str] = []
                 calls: dict[int, ToolCall] = {}
+                finish_reason = None
                 async for chunk in stream:
                     if not chunk.choices:
                         continue
+                    finish_reason = chunk.choices[0].finish_reason or finish_reason
                     delta = chunk.choices[0].delta
                     if delta.content:
                         started = True
@@ -150,7 +160,10 @@ class LLMRouter:
                 tool_calls = [calls[i] for i in sorted(calls)]
                 for n, call in enumerate(tool_calls):
                     call.id = call.id or f"call_{n}"
-                yield Turn(provider.name, "".join(content), tool_calls)
+                turn = Turn(provider.name, "".join(content), tool_calls, finish_reason)
+                if turn.truncated:
+                    logger.warning("%s stream ended early (%s)", provider.name, finish_reason)
+                yield turn
                 return
             except RETRYABLE as e:
                 if started:

@@ -122,7 +122,8 @@ class Agent:
                     if not turn.content:
                         raise RuntimeError("model returned no answer")
                     yield Event("sources", list(sources.values()))
-                    yield Event("done", {"provider": provider, "rounds": round_ + 1})
+                    done = {"provider": provider, "rounds": round_ + 1}
+                    yield Event("done", {**done, "truncated": turn.truncated})
                     return
 
                 messages.append(

@@ -7,6 +7,7 @@ from ragnaw.llm import ProvidersUnavailable, Token, ToolCall, Turn
 class Script:
     tokens: list[str] = field(default_factory=list)
     tool_calls: list[ToolCall] = field(default_factory=list)
+    finish_reason: str | None = "stop"
 
 
 class ScriptedRouter:
@@ -26,4 +27,4 @@ class ScriptedRouter:
         script = self.rounds.pop(0)
         for text in script.tokens:
             yield Token(text)
-        yield Turn("fake", "".join(script.tokens), script.tool_calls)
+        yield Turn("fake", "".join(script.tokens), script.tool_calls, script.finish_reason)

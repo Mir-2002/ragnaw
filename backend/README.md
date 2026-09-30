@@ -26,7 +26,7 @@ uv run pytest
 
 - Secrets: `GROQ_API_KEY`, `GEMINI_API_KEY` (either may be left unset; Groq is tried first)
 - Variables: `CORS_ORIGINS` (comma-separated, e.g. the Vercel URL). Optional:
-  `GROQ_MODEL`, `GEMINI_MODEL`, `*_REASONING_EFFORT`, `CHAT_RATE_LIMIT`,
+  `GROQ_MODEL`, `GROQ_FALLBACK_MODEL`, `GEMINI_MODEL`, `*_REASONING_EFFORT`, `CHAT_RATE_LIMIT`,
   `CHAT_GLOBAL_RATE_LIMIT` (see `.env.example`)
 
 ## API

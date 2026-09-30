@@ -92,6 +92,8 @@ async def test_streams_tokens_and_reassembles_fragmented_tool_calls():
     assert (call.id, call.name, call.arguments) == ("call_a", "get_pokemon", '{"name": "pikachu"}')
     assert call.as_message_part()["extra_content"] == {"google": {"thought_signature": "sig"}}
     assert groq.requests[0]["reasoning_effort"] == "low"
+    assert "extra_body" not in groq.requests[0]
+    assert turn.truncated  # these chunks never send a finish_reason
     # Truncates Gemini streams after one chunk.
     assert "stream_options" not in groq.requests[0]
 
@@ -155,3 +157,20 @@ def test_reads_retry_delay_from_gemini_error_body():
     assert LLMRouter._retry_after(rate_limited(retry_after="7")) == 7
     assert LLMRouter._retry_after(rate_limited()) == 20
 
+
+@pytest.mark.anyio
+async def test_sends_extra_body_and_records_finish_reason():
+    qwen = LLMProvider(
+        "groq-fallback", "https://groq.example/v1", "k", "q", "none", {"reasoning_format": "hidden"}
+    )
+    last = chunk({})
+    last.choices[0].finish_reason = "stop"
+    client = FakeClient([chunk({"content": "done"}), last])
+    router = LLMRouter([qwen], timeout=5, max_tokens=100)
+    router.clients = {"groq-fallback": client}
+
+    _, turn = await collect(router)
+    assert client.requests[0]["extra_body"] == {"reasoning_format": "hidden"}
+    assert client.requests[0]["reasoning_effort"] == "none"
+    assert turn.finish_reason == "stop"
+    assert not turn.truncated

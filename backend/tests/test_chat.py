@@ -27,7 +27,7 @@ async def test_runs_tools_then_streams_the_answer(tools):
     assert [name for name, _ in result] == ["status", "token", "token", "sources", "done"]
     assert result[0][1] == {"text": "Looking up pikachoo"}
     assert result[3][1][0]["url"] == "https://pokeapi.co/api/v2/pokemon/pikachu"
-    assert result[4][1] == {"provider": "fake", "rounds": 2}
+    assert result[4][1] == {"provider": "fake", "rounds": 2, "truncated": False}
 
     # Round 2 saw the tool result, and stayed on the provider that answered round 1.
     tool_message = router.calls[1]["messages"][-1]
@@ -46,7 +46,14 @@ async def test_last_round_forbids_tools(tools):
     )
     result = await events(Agent(router, tools, max_tool_rounds=1, max_tool_result_chars=6000))
     assert [c["tool_choice"] for c in router.calls] == ["auto", "none"]
-    assert result[-1] == ("done", {"provider": "fake", "rounds": 2})
+    assert result[-1] == ("done", {"provider": "fake", "rounds": 2, "truncated": False})
+
+
+@pytest.mark.anyio
+async def test_flags_answers_whose_stream_was_cut_off(tools):
+    cut_off = Script(tokens=["Among standard species, **Talon"], finish_reason=None)
+    result = await events(Agent(ScriptedRouter(cut_off), tools, 3, 6000))
+    assert result[-1] == ("done", {"provider": "fake", "rounds": 1, "truncated": True})
 
 
 @pytest.mark.anyio
