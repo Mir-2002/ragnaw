@@ -130,7 +130,7 @@ export function Chat() {
         {/* Styled after the location sign that pops up on entering a new area. */}
         <Frame fillClassName="px-text py-2">
           <h1 className="px-label text-base leading-none font-bold sm:text-lg">RAGNaw</h1>
-          <p className="mt-1 text-xs text-[var(--ink-soft)]">Pokémon answers from PokeAPI data</p>
+          <p className="px-label mt-1 text-[10px] text-[var(--ink-soft)]">Pokémon answers from PokeAPI data</p>
         </Frame>
         <Frame fillClassName="px-text flex items-center gap-3 py-2">
           <BackendStatusPill status={status} />
@@ -157,13 +157,13 @@ export function Chat() {
         {exchanges.length === 0 ? (
           <div className="flex h-full flex-col justify-end">
             <Frame fillClassName="px-text flex flex-col gap-3">
-              <p className="text-lg leading-snug">
+              <p className="leading-snug">
                 {unavailable ??
                   "Hi! Ask me about any Pokémon, move, ability or type, and I’ll look it up in PokeAPI’s data."}
               </p>
               {!unavailable && (
                 <>
-                  <p className="text-sm text-[var(--ink-soft)]">Try one:</p>
+                  <p className="text-[var(--ink-soft)]">Try one:</p>
                   <ExampleList examples={EXAMPLES} onPick={send} />
                 </>
               )}
@@ -208,7 +208,7 @@ export function Chat() {
                 placeholder="e.g. What is Gengar weak to?"
                 aria-invalid={tooLong || undefined}
                 rows={1}
-                className="field-sizing-content max-h-32 min-h-8 resize-none bg-transparent text-lg leading-snug outline-none placeholder:text-[var(--ink-soft)] placeholder:opacity-70"
+                className="field-sizing-content max-h-32 min-h-8 resize-none bg-transparent leading-snug outline-none placeholder:text-[var(--ink-soft)] placeholder:opacity-70"
               />
             </label>
             {busy ? (
@@ -221,7 +221,7 @@ export function Chat() {
               </button>
             )}
           </form>
-          <p className="mt-2 flex justify-between gap-3 text-xs text-[var(--ink-soft)]">
+          <p className="px-label mt-2 flex justify-between gap-3 text-[10px] text-[var(--ink-soft)]">
             {/* Keyboard hints; touch screens have no Enter/Shift to speak of. */}
             <span className="hidden sm:inline">Enter to ask · Shift+Enter for a new line · Start for the menu</span>
             {question.length > MAX_QUESTION_CHARS * 0.8 && (
@@ -231,7 +231,7 @@ export function Chat() {
             )}
           </p>
         </Frame>
-        <p className="px-text text-center text-[11px] [--ink:#f8f8f8] [--ink-shadow:#283878]">
+        <p className="px-text px-label text-center text-[10px] [--ink:#f8f8f8] [--ink-shadow:#283878]">
           Unofficial fan project. Pokémon © Nintendo, Game Freak, Creatures. Data from PokeAPI.
         </p>
       </footer>

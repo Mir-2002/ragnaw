@@ -202,6 +202,9 @@
     image-rendering: pixelated;
     color: var(--ink);
     font-family: var(--font-pixel), ui-monospace, monospace;
+    /* DotGothic16 is only crisp on its 16px grid; body text stays at exactly 16px, and
+       anything smaller uses the Silkscreen labels instead. */
+    font-size: 16px;
     font-synthesis: none;
   }
 
@@ -357,7 +360,6 @@
   .px-answer table {
     width: 100%;
     border-collapse: collapse;
-    font-size: 0.95em;
   }
   .px-answer th {
     background: var(--frame-band);

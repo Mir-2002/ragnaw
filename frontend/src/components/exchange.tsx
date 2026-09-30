@@ -79,7 +79,7 @@ export function ExchangeView({
 
 function Steps({ steps, active }: { steps: string[]; active: boolean }) {
   return (
-    <ul className="flex flex-col gap-0.5 text-sm text-[var(--ink-soft)]">
+    <ul className="flex flex-col gap-0.5 text-[var(--ink-soft)]">
       {steps.map((step, i) => (
         <li key={i}>
           {step}
@@ -160,7 +160,7 @@ function Sources({ sources }: { sources: Source[] }) {
                   </span>
                 )}
                 <span className="px-label min-w-0 flex-1 truncate text-xs">{source.title}</span>
-                <span className="text-xs text-[var(--ink-soft)]">{KIND_LABELS[source.kind] ?? source.kind}</span>
+                <span className="px-label text-[10px] text-[var(--ink-soft)]">{KIND_LABELS[source.kind] ?? source.kind}</span>
               </a>
             </li>
           );

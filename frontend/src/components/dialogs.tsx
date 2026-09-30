@@ -111,7 +111,7 @@ export function OptionDialog(props: DialogProps) {
           </div>
         ))}
       </div>
-      <p className="text-sm text-[var(--ink-soft)]">↑↓ choose a setting · ←→ change it</p>
+      <p className="text-[var(--ink-soft)]">↑↓ choose a setting · ←→ change it</p>
     </Shell>
   );
 }
@@ -128,7 +128,7 @@ export function AboutDialog(props: DialogProps) {
           For each question, an LLM looks things up with a set of tools and search, then writes
           the answer from what it found. The sources under each answer show what it used.
         </p>
-        <p className="text-sm text-[var(--ink-soft)]">
+        <p className="text-[var(--ink-soft)]">
           Unofficial fan project. Pokémon © Nintendo, Game Freak, Creatures. Data and sprites
           from{" "}
           <a href="https://pokeapi.co" target="_blank" rel="noreferrer" className="underline underline-offset-2">

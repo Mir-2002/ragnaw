@@ -77,7 +77,7 @@ export function StartMenu({ examples, canAsk, canClear, onAsk, onNewChat, onOpti
               </Menu.Item>
             </Frame>
             {/* Like the handheld menus, the highlighted item is explained below. */}
-            <Frame fillClassName="px-text py-3 text-sm leading-snug" aria-live="polite">
+            <Frame fillClassName="px-text py-3 leading-snug" aria-live="polite">
               {hint}
             </Frame>
           </Menu.Popup>

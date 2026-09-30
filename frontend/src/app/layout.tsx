@@ -1,11 +1,11 @@
 import type { Metadata } from "next";
-import { Silkscreen, Tiny5 } from "next/font/google";
+import { DotGothic16, Silkscreen } from "next/font/google";
 import { ThemeProvider } from "@/components/theme";
 import "./globals.css";
 
-// Body text: a proportional pixel face whose digits stay unambiguous in stat tables
-// (Pixelify Sans drew 5 and S almost identically).
-const tiny5 = Tiny5({
+// Body text: a pixel face drawn on a 16px grid, so it's crisp (and readable) at exactly
+// 16px. Pixelify Sans drew 5 and S almost identically; Tiny5 was too coarse to read.
+const dotGothic = DotGothic16({
   variable: "--font-pixel",
   weight: "400",
   subsets: ["latin"],
@@ -28,7 +28,7 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
     // next-themes sets data-frame on <html> before hydration.
     <html
       lang="en"
-      className={`${tiny5.variable} ${silkscreen.variable} h-full antialiased`}
+      className={`${dotGothic.variable} ${silkscreen.variable} h-full antialiased`}
       suppressHydrationWarning
     >
       <body className="min-h-full">
