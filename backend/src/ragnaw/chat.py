@@ -13,6 +13,7 @@ from typing import Any, Protocol
 import anyio.to_thread
 
 from ragnaw.llm import ProvidersUnavailable, Token, Turn
+from ragnaw.text import normalize
 from ragnaw.tools import ToolBox
 
 logger = logging.getLogger(__name__)
@@ -77,6 +78,23 @@ def fit(data: dict, max_chars: int) -> str:
     return text if len(text) <= max_chars else text[:max_chars] + "…(truncated)"
 
 
+def cited(sources: list[dict], answer: str) -> list[dict]:
+    """The sources the answer mentions by name, one per name.
+
+    Search returns neighbours the model didn't use (Medicham for a Mimikyu question), and an
+    entity can arrive both as a Pokédex hit and a get_pokemon result; the sprite wins.
+    """
+    text = f" {normalize(answer)} "
+    kept: dict[str, dict] = {}
+    for source in sources:
+        title = normalize(source["title"])
+        if not title or f" {title} " not in text:
+            continue
+        if title not in kept or (source.get("image") and not kept[title].get("image")):
+            kept[title] = source
+    return list(kept.values())
+
+
 class Agent:
     def __init__(
         self,
@@ -95,7 +113,8 @@ class Agent:
             {"role": "system", "content": SYSTEM_PROMPT},
             {"role": "user", "content": question},
         ]
-        sources: dict[str, dict] = {}
+        sources: dict[str, dict] = {}  # by URL
+        answer: list[str] = []
         provider: str | None = None
 
         try:
@@ -110,6 +129,7 @@ class Agent:
                     prefer=provider,
                 ):
                     if isinstance(item, Token):
+                        answer.append(item.text)
                         yield Event("token", {"text": item.text})
                     else:
                         turn = item
@@ -121,7 +141,7 @@ class Agent:
                 if not turn.tool_calls or last:
                     if not turn.content:
                         raise RuntimeError("model returned no answer")
-                    yield Event("sources", list(sources.values()))
+                    yield Event("sources", cited(list(sources.values()), "".join(answer)))
                     done = {"provider": provider, "rounds": round_ + 1}
                     yield Event("done", {**done, "truncated": turn.truncated})
                     return

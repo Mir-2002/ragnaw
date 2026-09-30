@@ -3,7 +3,7 @@ import json
 import pytest
 from fakes import Script, ScriptedRouter
 
-from ragnaw.chat import BUSY_MESSAGE, Agent, fit
+from ragnaw.chat import BUSY_MESSAGE, Agent, cited, fit
 from ragnaw.llm import ToolCall
 from ragnaw.rate_limit import RateLimiter
 
@@ -127,3 +127,18 @@ def test_chat_endpoint_rejects_before_streaming(client, tools, monkeypatch):
 def test_chat_endpoint_without_llm_is_unavailable(client, monkeypatch):
     monkeypatch.setattr(client.app.state, "agent", None)
     assert client.post("/chat", json={"question": "hi"}).status_code == 503
+
+
+def test_cited_keeps_only_sources_the_answer_names():
+    sources = [
+        {"title": "Mimikyu", "kind": "species", "url": "s/778"},
+        {"title": "Medicham", "kind": "species", "url": "s/308"},
+        {"title": "Mimikyu", "kind": "pokemon", "url": "p/778", "image": "778.png"},
+        {"title": "Mr. Mime", "kind": "species", "url": "s/122"},
+    ]
+    answer = "**Mimikyu** hides under a rag. Unlike mr mime, it..."
+    kept = cited(sources, answer)
+    # One Mimikyu card (the one with a sprite); Medicham isn't mentioned.
+    assert [s["url"] for s in kept] == ["p/778", "s/122"]
+    # Whole names only: "Mew" must not match inside "Mewtwo".
+    assert cited([{"title": "Mew", "kind": "pokemon", "url": "p/151"}], "Mewtwo is strong") == []

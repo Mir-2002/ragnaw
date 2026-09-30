@@ -137,25 +137,30 @@ class LLMRouter:
                 content: list[str] = []
                 calls: dict[int, ToolCall] = {}
                 finish_reason = None
-                async for chunk in stream:
-                    if not chunk.choices:
-                        continue
-                    finish_reason = chunk.choices[0].finish_reason or finish_reason
-                    delta = chunk.choices[0].delta
-                    if delta.content:
-                        started = True
-                        content.append(delta.content)
-                        yield Token(delta.content)
-                    for part in delta.tool_calls or []:
-                        index = part.index if part.index is not None else len(calls)
-                        call = calls.setdefault(index, ToolCall("", "", ""))
-                        if part.id:
-                            call.id = part.id
-                        if part.function and part.function.name:
-                            call.name = part.function.name
-                        if part.function and part.function.arguments:
-                            call.arguments += part.function.arguments
-                        call.extra.update(part.model_extra or {})
+                try:
+                    async for chunk in stream:
+                        if not chunk.choices:
+                            continue
+                        finish_reason = chunk.choices[0].finish_reason or finish_reason
+                        delta = chunk.choices[0].delta
+                        if delta.content:
+                            started = True
+                            content.append(delta.content)
+                            yield Token(delta.content)
+                        for part in delta.tool_calls or []:
+                            index = part.index if part.index is not None else len(calls)
+                            call = calls.setdefault(index, ToolCall("", "", ""))
+                            if part.id:
+                                call.id = part.id
+                            if part.function and part.function.name:
+                                call.name = part.function.name
+                            if part.function and part.function.arguments:
+                                call.arguments += part.function.arguments
+                            call.extra.update(part.model_extra or {})
+                finally:
+                    # When the visitor stops or disconnects, this generator is closed early;
+                    # release the upstream response now instead of whenever it's collected.
+                    await stream.close()
 
                 tool_calls = [calls[i] for i in sorted(calls)]
                 for n, call in enumerate(tool_calls):

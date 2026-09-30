@@ -41,11 +41,21 @@ class FakeClient:
         if self.error:
             raise self.error
 
-        async def stream():
-            for c in self.chunks:
-                yield c
+        return FakeStream(self.chunks)
 
-        return stream()
+
+class FakeStream:
+    """Mimics openai.AsyncStream: async-iterable, with close()."""
+
+    def __init__(self, chunks):
+        self.chunks, self.closed = chunks, False
+
+    async def __aiter__(self):
+        for c in self.chunks:
+            yield c
+
+    async def close(self):
+        self.closed = True
 
 
 def make_router(**clients: FakeClient) -> LLMRouter:
@@ -174,3 +184,21 @@ async def test_sends_extra_body_and_records_finish_reason():
     assert client.requests[0]["reasoning_effort"] == "none"
     assert turn.finish_reason == "stop"
     assert not turn.truncated
+
+
+@pytest.mark.anyio
+async def test_closes_the_upstream_stream_when_the_consumer_stops_early():
+    groq = FakeClient([chunk({"content": "a"}), chunk({"content": "b"})])
+    real_create = groq.create
+    streams = []
+
+    async def create(**params):
+        stream = await real_create(**params)
+        streams.append(stream)
+        return stream
+
+    groq.create = create
+    items = make_router(groq=groq).stream([{"role": "user", "content": "hi"}], [])
+    assert isinstance(await anext(items), Token)
+    await items.aclose()  # e.g. the visitor pressed Stop
+    assert streams[0].closed
