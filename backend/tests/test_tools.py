@@ -6,7 +6,7 @@ from ragnaw.tools import spec_tokens_estimate
 
 
 def run(tools, tool, **args):
-    return tools.run(tool, json.dumps(args))
+    return tools.run(tool, json.dumps(args)).data
 
 
 def test_specs_stay_small_and_flat(tools):
@@ -15,6 +15,15 @@ def test_specs_stay_small_and_flat(tools):
     text = json.dumps(tools.specs)
     for unsupported in ('"$ref"', '"$defs"', '"anyOf"', '"title"'):
         assert unsupported not in text
+    # Groq rejects out-of-bounds calls server-side, before we can return a fixable error.
+    for bound in ('"maximum"', '"maxItems"'):
+        assert bound not in text
+
+
+def test_bounds_still_enforced_server_side(tools):
+    result = run(tools, "filter_pokemon", types=["normal"], limit=50)
+    assert len(result["results"]) == 25  # clamped, not an error
+    assert "error" in run(tools, "filter_pokemon", types=["fire", "water", "grass"])
 
 
 @pytest.mark.parametrize(
@@ -111,4 +120,12 @@ def test_search_knowledge_filters_kind(tools):
     ],
 )
 def test_bad_calls_return_errors_not_exceptions(tools, name, arguments):
-    assert "error" in tools.run(name, arguments)
+    assert "error" in tools.run(name, arguments).data
+
+
+def test_sources_stay_out_of_model_data(tools):
+    result = tools.run("get_pokemon", '{"name": "pikachu"}')
+    assert "sprite_url" not in result.data and "identifier" not in result.data
+    (source,) = result.sources
+    assert source["url"] == "https://pokeapi.co/api/v2/pokemon/pikachu"
+    assert source["image"].endswith("/25.png")

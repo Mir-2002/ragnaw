@@ -25,4 +25,14 @@ uv run pytest
 ## Space settings
 
 - Secrets: `GROQ_API_KEY`, `GEMINI_API_KEY` (either may be left unset; Groq is tried first)
-- Variables: `GROQ_MODEL`, `GEMINI_MODEL` (optional), `CORS_ORIGINS` (comma-separated, e.g. the Vercel URL)
+- Variables: `CORS_ORIGINS` (comma-separated, e.g. the Vercel URL). Optional:
+  `GROQ_MODEL`, `GEMINI_MODEL`, `*_REASONING_EFFORT`, `CHAT_RATE_LIMIT`,
+  `CHAT_GLOBAL_RATE_LIMIT` (see `.env.example`)
+
+## API
+
+- `GET|HEAD /health`: `{status, data_ready, llm_providers}`
+- `POST /chat` with `{"question": "..."}`: Server-Sent Events, in order: `status`
+  (per tool call), `token` (answer text), `sources`, `done`. A single `error` event
+  replaces the rest if answering fails. Rejections happen before streaming: 422 (empty or
+  too long), 429 with `Retry-After`, or 503 (no data or no LLM key).

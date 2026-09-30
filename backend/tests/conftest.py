@@ -19,3 +19,8 @@ def index(client):
 @pytest.fixture(scope="session")
 def tools(client):
     return client.app.state.tools
+
+
+@pytest.fixture
+def anyio_backend():
+    return "asyncio"

@@ -147,6 +147,7 @@ class Catalog:
             ).fetchone()
 
         return {
+            "identifier": p["identifier"],
             "name": p["name"],
             "species": p["species"],
             "genus": p["genus"],
@@ -331,6 +332,7 @@ class Catalog:
         with self._connect() as con:
             m = con.execute("SELECT * FROM moves WHERE id = ?", (move_id,)).fetchone()
         return {
+            "identifier": m["identifier"],
             "name": m["name"],
             "type": m["type"],
             "category": m["damage_class"],
@@ -354,6 +356,7 @@ class Catalog:
             ).fetchall()
         shown = [f"{h['name']}{' (hidden)' if h['is_hidden'] else ''}" for h in holders]
         return {
+            "identifier": a["identifier"],
             "name": a["name"],
             "effect": a["effect"] or a["short_effect"] or a["flavor_text"],
             "generation": a["generation"],
