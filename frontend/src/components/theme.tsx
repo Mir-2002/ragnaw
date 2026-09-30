@@ -1,29 +1,28 @@
 "use client";
 
-import { MoonIcon, SunIcon } from "lucide-react";
-import { ThemeProvider as NextThemesProvider, useTheme } from "next-themes";
-import { Button } from "@/components/ui/button";
+import { ThemeProvider as NextThemesProvider } from "next-themes";
+
+// Frames are next-themes themes stored as data-frame on <html>. "light" and "dark" are
+// next-themes' names for what "system" resolves to, so AUTO picks blue or night.
+export const FRAMES = [
+  { theme: "system", label: "Auto" },
+  { theme: "light", label: "Blue" },
+  { theme: "red", label: "Red" },
+  { theme: "green", label: "Green" },
+  { theme: "dark", label: "Night" },
+] as const;
 
 export function ThemeProvider({ children }: { children: React.ReactNode }) {
   return (
-    <NextThemesProvider attribute="class" defaultTheme="system" enableSystem disableTransitionOnChange>
+    <NextThemesProvider
+      attribute="data-frame"
+      themes={["light", "red", "green", "dark"]}
+      value={{ light: "blue", red: "red", green: "green", dark: "night" }}
+      defaultTheme="system"
+      enableSystem
+      disableTransitionOnChange
+    >
       {children}
     </NextThemesProvider>
-  );
-}
-
-export function ThemeToggle() {
-  const { resolvedTheme, setTheme } = useTheme();
-  return (
-    <Button
-      variant="ghost"
-      size="icon"
-      aria-label="Toggle dark mode"
-      onClick={() => setTheme(resolvedTheme === "dark" ? "light" : "dark")}
-    >
-      {/* Both icons render; CSS picks one, so server and client markup match. */}
-      <SunIcon className="dark:hidden" />
-      <MoonIcon className="hidden dark:block" />
-    </Button>
   );
 }

@@ -1,15 +1,20 @@
 import type { Metadata } from "next";
-import { Geist, Geist_Mono } from "next/font/google";
+import { Silkscreen, Tiny5 } from "next/font/google";
 import { ThemeProvider } from "@/components/theme";
 import "./globals.css";
 
-const geistSans = Geist({
-  variable: "--font-geist-sans",
+// Body text: a proportional pixel face whose digits stay unambiguous in stat tables
+// (Pixelify Sans drew 5 and S almost identically).
+const tiny5 = Tiny5({
+  variable: "--font-pixel",
+  weight: "400",
   subsets: ["latin"],
 });
 
-const geistMono = Geist_Mono({
-  variable: "--font-geist-mono",
+// Menu labels and names, set in caps like the handheld menus.
+const silkscreen = Silkscreen({
+  variable: "--font-silkscreen",
+  weight: ["400", "700"],
   subsets: ["latin"],
 });
 
@@ -20,10 +25,10 @@ export const metadata: Metadata = {
 
 export default function RootLayout({ children }: LayoutProps<"/">) {
   return (
-    // next-themes sets the theme class on <html> before hydration.
+    // next-themes sets data-frame on <html> before hydration.
     <html
       lang="en"
-      className={`${geistSans.variable} ${geistMono.variable} h-full antialiased`}
+      className={`${tiny5.variable} ${silkscreen.variable} h-full antialiased`}
       suppressHydrationWarning
     >
       <body className="min-h-full">

@@ -1,13 +1,13 @@
-import { AlertCircleIcon, CheckIcon, Loader2Icon, RotateCcwIcon, ScissorsIcon } from "lucide-react";
+"use client";
+
 import Image from "next/image";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
-import { Alert, AlertAction, AlertDescription, AlertTitle } from "@/components/ui/alert";
-import { Badge } from "@/components/ui/badge";
-import { Button } from "@/components/ui/button";
-import { Card, CardContent } from "@/components/ui/card";
-import { Skeleton } from "@/components/ui/skeleton";
+import { Frame, MoreArrow } from "@/components/retro";
+import { charsPerSecond, type TextSpeed } from "@/hooks/use-text-speed";
+import { useTypewriter } from "@/hooks/use-typewriter";
 import type { Source } from "@/lib/api";
+import { pixelSprite } from "@/lib/sprites";
 
 export type Exchange = {
   id: string;
@@ -29,91 +29,81 @@ const KIND_LABELS: Record<Source["kind"], string> = {
 
 export function ExchangeView({
   exchange,
+  speed,
   onRetry,
 }: {
   exchange: Exchange;
+  speed: TextSpeed;
   onRetry: (question: string) => void;
 }) {
-  const { question, steps, answer, sources, phase } = exchange;
+  const { question, steps, sources, phase } = exchange;
+  const typed = useTypewriter(exchange.answer, charsPerSecond(speed));
   const working = phase === "working";
+  const finished = !working && typed.done;
 
   return (
     <article className="flex flex-col gap-3">
-      <p className="self-end rounded-2xl rounded-br-sm bg-muted px-4 py-2 text-sm whitespace-pre-wrap">
-        {question}
-      </p>
+      <div className="flex justify-end">
+        <Frame className="max-w-[85%]" fillClassName="px-text py-2 whitespace-pre-wrap">
+          <span className="px-label mr-2 text-xs text-[var(--frame-band)]">You</span>
+          {question}
+        </Frame>
+      </div>
 
-      <Card size="sm" className="gap-3">
-        <CardContent className="flex flex-col gap-3">
-          {steps.length > 0 && <Steps steps={steps} active={working && !answer} />}
+      <Frame fillClassName="px-text relative flex flex-col gap-3 pb-6">
+        {steps.length > 0 && <Steps steps={steps} active={working && !exchange.answer} />}
 
-          {answer ? (
-            <Markdown text={answer} streaming={working} />
-          ) : working ? (
-            <div className="flex flex-col gap-2" aria-label="Waiting for the answer">
-              <Skeleton className="h-4 w-4/5" />
-              <Skeleton className="h-4 w-3/5" />
-            </div>
-          ) : null}
+        {exchange.answer ? (
+          <Markdown text={typed.text} />
+        ) : working ? (
+          <p className="text-[var(--ink-soft)]">
+            Thinking<span className="px-blink">…</span>
+          </p>
+        ) : null}
 
-          {exchange.truncated && (
-            <Alert>
-              <ScissorsIcon />
-              <AlertTitle>The answer was cut off</AlertTitle>
-              <AlertDescription>The model’s response ended early.</AlertDescription>
-              <AlertAction>
-                <Button size="sm" variant="outline" onClick={() => onRetry(question)}>
-                  <RotateCcwIcon data-icon="inline-start" /> Ask again
-                </Button>
-              </AlertAction>
-            </Alert>
-          )}
+        {exchange.truncated && finished && (
+          <Notice message="The answer was cut off." action="Ask again" onAction={() => onRetry(question)} />
+        )}
+        {phase === "error" && (
+          <Notice message={exchange.error ?? "Couldn’t answer that."} action="Retry" onAction={() => onRetry(question)} />
+        )}
+        {phase === "stopped" && <p className="text-[var(--ink-soft)]">You stopped this answer.</p>}
 
-          {phase === "error" && (
-            <Alert variant="destructive">
-              <AlertCircleIcon />
-              <AlertTitle>Couldn’t answer that</AlertTitle>
-              <AlertDescription>{exchange.error}</AlertDescription>
-              <AlertAction>
-                <Button size="sm" variant="outline" onClick={() => onRetry(question)}>
-                  <RotateCcwIcon data-icon="inline-start" /> Retry
-                </Button>
-              </AlertAction>
-            </Alert>
-          )}
+        {sources.length > 0 && finished && <Sources sources={sources} />}
 
-          {phase === "stopped" && <p className="text-xs text-muted-foreground">Stopped.</p>}
-
-          {sources.length > 0 && <Sources sources={sources} />}
-        </CardContent>
-      </Card>
+        {finished && phase === "done" && <MoreArrow className="absolute right-4 bottom-2" />}
+      </Frame>
     </article>
   );
 }
 
 function Steps({ steps, active }: { steps: string[]; active: boolean }) {
   return (
-    <ul className="flex flex-col gap-1 text-xs text-muted-foreground">
-      {steps.map((step, i) => {
-        const current = active && i === steps.length - 1;
-        return (
-          <li key={i} className="flex items-center gap-1.5">
-            {current ? (
-              <Loader2Icon className="size-3.5 animate-spin" />
-            ) : (
-              <CheckIcon className="size-3.5" />
-            )}
-            {step}
-          </li>
-        );
-      })}
+    <ul className="flex flex-col gap-0.5 text-sm text-[var(--ink-soft)]">
+      {steps.map((step, i) => (
+        <li key={i}>
+          {step}
+          {active && i === steps.length - 1 ? <span className="px-blink">…</span> : "."}
+        </li>
+      ))}
     </ul>
   );
 }
 
-function Markdown({ text, streaming }: { text: string; streaming: boolean }) {
+function Notice({ message, action, onAction }: { message: string; action: string; onAction: () => void }) {
   return (
-    <div className="prose prose-sm max-w-none dark:prose-invert prose-table:my-2 prose-th:py-1 prose-td:py-1">
+    <div className="flex flex-wrap items-center justify-between gap-3">
+      <p>{message}</p>
+      <button type="button" className="px-button px-label text-xs" onClick={onAction}>
+        <span className="px-key">A</span> {action}
+      </button>
+    </div>
+  );
+}
+
+function Markdown({ text }: { text: string }) {
+  return (
+    <div className="px-answer">
       <ReactMarkdown
         remarkPlugins={[remarkGfm]}
         components={{
@@ -127,9 +117,6 @@ function Markdown({ text, streaming }: { text: string; streaming: boolean }) {
       >
         {text}
       </ReactMarkdown>
-      {streaming && (
-        <span className="ml-0.5 inline-block h-4 w-1.5 animate-pulse bg-foreground align-middle" />
-      )}
     </div>
   );
 }
@@ -143,38 +130,41 @@ function withoutNode<T extends { node?: unknown }>(props: T): Omit<T, "node"> {
 
 function Sources({ sources }: { sources: Source[] }) {
   return (
-    <section className="flex flex-col gap-2 border-t pt-3">
-      <h3 className="text-xs font-medium text-muted-foreground">Sources</h3>
+    <section className="flex flex-col gap-2 border-t-[length:var(--px)] border-dashed border-[var(--frame-light)] pt-3">
+      <h3 className="px-label text-xs text-[var(--ink-soft)]">Sources</h3>
       <ul className="grid grid-cols-1 gap-2 sm:grid-cols-2">
-        {sources.map((source) => (
-          <li key={source.url}>
-            <a
-              href={source.url}
-              target="_blank"
-              rel="noreferrer"
-              className="flex items-center gap-3 rounded-lg border p-2 text-sm transition-colors hover:bg-muted"
-            >
-              {source.image ? (
-                // unoptimized: sprites are already small PNGs, and resizing them would
-                // spend Vercel's image optimization quota for nothing.
-                <Image
-                  src={source.image}
-                  alt=""
-                  width={40}
-                  height={40}
-                  unoptimized
-                  className="size-10 shrink-0 object-contain"
-                />
-              ) : (
-                <span className="flex size-10 shrink-0 items-center justify-center rounded-md bg-muted text-xs text-muted-foreground">
-                  {source.title.slice(0, 2)}
-                </span>
-              )}
-              <span className="min-w-0 flex-1 truncate font-medium">{source.title}</span>
-              <Badge variant="secondary">{KIND_LABELS[source.kind] ?? source.kind}</Badge>
-            </a>
-          </li>
-        ))}
+        {sources.map((source) => {
+          const sprite = source.image ? pixelSprite(source.image) : undefined;
+          return (
+            <li key={source.url}>
+              <a
+                href={source.url}
+                target="_blank"
+                rel="noreferrer"
+                className="flex items-center gap-3 bg-[var(--stripe)] p-1.5 pr-3 hover:brightness-95"
+              >
+                {sprite ? (
+                  // unoptimized: resizing would smooth the pixel art, and would spend Vercel's
+                  // image optimization quota on 64px PNGs.
+                  <Image
+                    src={sprite}
+                    alt=""
+                    width={48}
+                    height={48}
+                    unoptimized
+                    className="px-sprite size-12 shrink-0"
+                  />
+                ) : (
+                  <span className="px-label grid size-12 shrink-0 place-items-center text-xs text-[var(--ink-soft)]">
+                    {KIND_LABELS[source.kind]?.slice(0, 3)}
+                  </span>
+                )}
+                <span className="px-label min-w-0 flex-1 truncate text-xs">{source.title}</span>
+                <span className="text-xs text-[var(--ink-soft)]">{KIND_LABELS[source.kind] ?? source.kind}</span>
+              </a>
+            </li>
+          );
+        })}
       </ul>
     </section>
   );

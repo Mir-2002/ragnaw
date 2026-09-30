@@ -1,13 +1,13 @@
 "use client";
 
-import { ArrowUpIcon, SquareIcon } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 import { BackendStatusPill, unavailableReason } from "@/components/backend-status";
+import { AboutDialog, OptionDialog } from "@/components/dialogs";
 import { type Exchange, ExchangeView } from "@/components/exchange";
-import { ThemeToggle } from "@/components/theme";
-import { Button } from "@/components/ui/button";
-import { Textarea } from "@/components/ui/textarea";
+import { Frame } from "@/components/retro";
+import { StartMenu } from "@/components/start-menu";
 import { useBackendStatus } from "@/hooks/use-backend-status";
+import { useTextSpeed } from "@/hooks/use-text-speed";
 import { ask, MAX_QUESTION_CHARS } from "@/lib/api";
 
 const EXAMPLES = [
@@ -21,22 +21,47 @@ const EXAMPLES = [
 
 export function Chat() {
   const { status, health } = useBackendStatus();
+  const [speed] = useTextSpeed();
   const [exchanges, setExchanges] = useState<Exchange[]>([]);
   const [input, setInput] = useState("");
   const [busy, setBusy] = useState(false);
+  const [dialog, setDialog] = useState<"option" | "about" | null>(null);
   const abortRef = useRef<AbortController | null>(null);
-  const endRef = useRef<HTMLDivElement>(null);
+  const mainRef = useRef<HTMLElement>(null);
+  const listRef = useRef<HTMLDivElement>(null);
+  // Follow the conversation while the reader is at the bottom; stop if they scroll up.
+  const stickToBottom = useRef(true);
+  const inputRef = useRef<HTMLTextAreaElement>(null);
 
   const unavailable = unavailableReason(status, health);
   const question = input.trim();
   const tooLong = question.length > MAX_QUESTION_CHARS;
-  const canSend = !busy && !unavailable && question.length > 0 && !tooLong;
+  const canAsk = !busy && !unavailable;
+  const canSend = canAsk && question.length > 0 && !tooLong;
 
-  // Keep the newest exchange in view as it streams.
-  const last = exchanges.at(-1);
+  // The typewriter keeps growing the answer after the stream ends, so follow the list's
+  // size rather than its data.
+  const hasExchanges = exchanges.length > 0;
   useEffect(() => {
-    endRef.current?.scrollIntoView({ block: "end" });
-  }, [last?.answer, last?.steps.length, last?.phase, exchanges.length]);
+    const main = mainRef.current;
+    const list = listRef.current;
+    if (!main || !list) return;
+    const observer = new ResizeObserver(() => {
+      if (stickToBottom.current) main.scrollTop = main.scrollHeight;
+    });
+    observer.observe(list);
+    return () => observer.disconnect();
+  }, [hasExchanges]);
+
+  // B button: Escape stops an answer in progress (menus and dialogs handle their own).
+  useEffect(() => {
+    if (!busy) return;
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === "Escape" && !dialog) abortRef.current?.abort();
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [busy, dialog]);
 
   function update(id: string, change: (e: Exchange) => Partial<Exchange>) {
     setExchanges((all) => all.map((e) => (e.id === id ? { ...e, ...change(e) } : e)));
@@ -50,6 +75,7 @@ export function Chat() {
     ]);
     setInput("");
     setBusy(true);
+    stickToBottom.current = true;
     const controller = new AbortController();
     abortRef.current = controller;
 
@@ -75,8 +101,11 @@ export function Chat() {
       }
       // A stream that closes without done/error (e.g. the connection dropped).
       update(id, (e) =>
-        e.phase === "working" ? { phase: e.answer ? "done" : "error", truncated: !!e.answer,
-          error: e.answer ? undefined : "The connection closed before an answer arrived." } : {},
+        e.phase !== "working"
+          ? {}
+          : e.answer
+            ? { phase: "done", truncated: true }
+            : { phase: "error", error: "The connection closed before an answer arrived." },
       );
     } catch (error) {
       if (controller.signal.aborted) {
@@ -85,123 +114,158 @@ export function Chat() {
         const message = error instanceof Error ? error.message : "Something went wrong.";
         update(id, () => ({
           phase: "error",
-          error: error instanceof TypeError ? "Couldn't reach the backend." : message,
+          error: error instanceof TypeError ? "Couldn’t reach the server." : message,
         }));
       }
     } finally {
       abortRef.current = null;
       setBusy(false);
+      inputRef.current?.focus();
     }
   }
 
   return (
-    <div className="mx-auto flex h-dvh w-full max-w-3xl flex-col">
-      <header className="flex items-center justify-between gap-3 border-b px-4 py-3">
-        <div className="flex items-baseline gap-2">
-          <h1 className="text-lg font-semibold tracking-tight">RAGNaw</h1>
-          <span className="hidden text-sm text-muted-foreground sm:inline">
-            Pokémon answers from PokeAPI data
-          </span>
-        </div>
-        <div className="flex items-center gap-1">
+    <div className="mx-auto flex h-dvh w-full max-w-3xl flex-col gap-3 p-3 sm:p-4">
+      <header className="flex items-start justify-between gap-3">
+        {/* Styled after the location sign that pops up on entering a new area. */}
+        <Frame fillClassName="px-text py-2">
+          <h1 className="px-label text-base leading-none font-bold sm:text-lg">RAGNaw</h1>
+          <p className="mt-1 text-xs text-[var(--ink-soft)]">Pokémon answers from PokeAPI data</p>
+        </Frame>
+        <Frame fillClassName="px-text flex items-center gap-3 py-2">
           <BackendStatusPill status={status} />
-          <ThemeToggle />
-        </div>
+          <StartMenu
+            examples={EXAMPLES}
+            canAsk={canAsk}
+            canClear={!busy && exchanges.length > 0}
+            onAsk={send}
+            onNewChat={() => setExchanges([])}
+            onOption={() => setDialog("option")}
+            onAbout={() => setDialog("about")}
+          />
+        </Frame>
       </header>
 
-      <main className="flex-1 overflow-y-auto px-4 py-6">
+      <main
+        ref={mainRef}
+        onScroll={(e) => {
+          const el = e.currentTarget;
+          stickToBottom.current = el.scrollHeight - el.scrollTop - el.clientHeight < 80;
+        }}
+        className="-mx-1 flex-1 overflow-y-auto px-1 py-2"
+      >
         {exchanges.length === 0 ? (
-          <div className="flex h-full flex-col items-center justify-center gap-6 text-center">
-            <div className="flex flex-col gap-2">
-              <h2 className="text-2xl font-semibold tracking-tight">Ask anything about Pokémon</h2>
-              <p className="text-sm text-muted-foreground">
-                Stats, types, matchups, evolutions, moves, abilities and Pokédex lore, as of the
-                latest games.
+          <div className="flex h-full flex-col justify-end">
+            <Frame fillClassName="px-text flex flex-col gap-3">
+              <p className="text-lg leading-snug">
+                {unavailable ??
+                  "Hi! Ask me about any Pokémon, move, ability or type, and I’ll look it up in PokeAPI’s data."}
               </p>
-            </div>
-            <div className="flex max-w-xl flex-wrap justify-center gap-2">
-              {EXAMPLES.map((example) => (
-                <Button
-                  key={example}
-                  variant="outline"
-                  size="sm"
-                  disabled={!!unavailable}
-                  onClick={() => send(example)}
-                >
-                  {example}
-                </Button>
-              ))}
-            </div>
+              {!unavailable && (
+                <>
+                  <p className="text-sm text-[var(--ink-soft)]">Try one:</p>
+                  <ExampleList examples={EXAMPLES} onPick={send} />
+                </>
+              )}
+            </Frame>
           </div>
         ) : (
-          <div className="flex flex-col gap-8">
+          <div ref={listRef} className="flex flex-col gap-6">
             {exchanges.map((exchange) => (
               <ExchangeView
                 key={exchange.id}
                 exchange={exchange}
+                speed={speed}
                 onRetry={(q) => !busy && send(q)}
               />
             ))}
-            <div ref={endRef} />
           </div>
         )}
       </main>
 
-      <footer className="border-t px-4 pt-3 pb-4">
-        <form
-          className="flex items-end gap-2"
-          onSubmit={(e) => {
-            e.preventDefault();
-            if (canSend) send(question);
-          }}
-        >
-          <Textarea
-            value={input}
-            onChange={(e) => setInput(e.target.value)}
-            onKeyDown={(e) => {
-              // Enter sends; Shift+Enter adds a line. Skip while an IME is composing.
-              if (e.key === "Enter" && !e.shiftKey && !e.nativeEvent.isComposing) {
-                e.preventDefault();
-                if (canSend) send(question);
-              }
+      <footer className="flex flex-col gap-2">
+        <Frame fillClassName="px-text py-3">
+          <form
+            className="flex items-end gap-3"
+            onSubmit={(e) => {
+              e.preventDefault();
+              if (canSend) send(question);
             }}
-            placeholder={unavailable ?? "Ask about a Pokémon, move, ability or type…"}
-            aria-label="Your question"
-            aria-invalid={tooLong || undefined}
-            rows={1}
-            className="max-h-40 min-h-10 resize-none"
-          />
-          {busy ? (
-            <Button
-              type="button"
-              size="icon-lg"
-              variant="outline"
-              aria-label="Stop"
-              onClick={() => abortRef.current?.abort()}
-            >
-              <SquareIcon />
-            </Button>
-          ) : (
-            <Button type="submit" size="icon-lg" aria-label="Send" disabled={!canSend}>
-              <ArrowUpIcon />
-            </Button>
-          )}
-        </form>
-        <div className="mt-2 flex justify-between gap-4 text-xs text-muted-foreground">
-          <span>
-            Unofficial fan project. Pokémon © Nintendo, Game Freak, Creatures. Data from{" "}
-            <a href="https://pokeapi.co" target="_blank" rel="noreferrer" className="underline underline-offset-2">
-              PokeAPI
-            </a>
-            .
-          </span>
-          {question.length > MAX_QUESTION_CHARS * 0.8 && (
-            <span className={tooLong ? "text-destructive" : undefined}>
-              {question.length}/{MAX_QUESTION_CHARS}
-            </span>
-          )}
-        </div>
+          >
+            <label className="flex min-w-0 flex-1 flex-col gap-1">
+              <span className="px-label text-xs text-[var(--frame-band)]">Your question</span>
+              <textarea
+                ref={inputRef}
+                value={input}
+                onChange={(e) => setInput(e.target.value)}
+                onKeyDown={(e) => {
+                  // Enter asks; Shift+Enter adds a line. Skip while an IME is composing.
+                  if (e.key === "Enter" && !e.shiftKey && !e.nativeEvent.isComposing) {
+                    e.preventDefault();
+                    if (canSend) send(question);
+                  }
+                }}
+                placeholder="e.g. What is Gengar weak to?"
+                aria-invalid={tooLong || undefined}
+                rows={1}
+                className="field-sizing-content max-h-32 min-h-8 resize-none bg-transparent text-lg leading-snug outline-none placeholder:text-[var(--ink-soft)] placeholder:opacity-70"
+              />
+            </label>
+            {busy ? (
+              <button type="button" className="px-button px-label text-xs" onClick={() => abortRef.current?.abort()}>
+                <span className="px-key">B</span> Stop
+              </button>
+            ) : (
+              <button type="submit" className="px-button px-label text-xs" disabled={!canSend}>
+                <span className="px-key">A</span> Ask
+              </button>
+            )}
+          </form>
+          <p className="mt-2 flex justify-between gap-3 text-xs text-[var(--ink-soft)]">
+            {/* Keyboard hints; touch screens have no Enter/Shift to speak of. */}
+            <span className="hidden sm:inline">Enter to ask · Shift+Enter for a new line · Start for the menu</span>
+            {question.length > MAX_QUESTION_CHARS * 0.8 && (
+              <span className={tooLong ? "text-[var(--accent)]" : undefined}>
+                {question.length}/{MAX_QUESTION_CHARS}
+              </span>
+            )}
+          </p>
+        </Frame>
+        <p className="px-text text-center text-[11px] [--ink:#f8f8f8] [--ink-shadow:#283878]">
+          Unofficial fan project. Pokémon © Nintendo, Game Freak, Creatures. Data from PokeAPI.
+        </p>
       </footer>
+
+      <OptionDialog open={dialog === "option"} onOpenChange={(open) => setDialog(open ? "option" : null)} />
+      <AboutDialog open={dialog === "about"} onOpenChange={(open) => setDialog(open ? "about" : null)} />
     </div>
+  );
+}
+
+/** Sample questions as a menu list: ↑/↓ move the ▶ cursor, Enter asks. */
+function ExampleList({ examples, onPick }: { examples: string[]; onPick: (q: string) => void }) {
+  function onKeyDown(e: React.KeyboardEvent<HTMLUListElement>) {
+    const step = { ArrowUp: -1, ArrowDown: 1 }[e.key];
+    if (!step) return;
+    e.preventDefault();
+    const buttons = [...e.currentTarget.querySelectorAll("button")];
+    const at = buttons.indexOf(document.activeElement as HTMLButtonElement);
+    buttons[(at + step + buttons.length) % buttons.length]?.focus();
+  }
+
+  return (
+    <ul className="flex flex-col gap-1" onKeyDown={onKeyDown}>
+      {examples.map((example) => (
+        <li key={example}>
+          <button
+            type="button"
+            className="px-cursor w-full cursor-pointer py-0.5 text-left outline-none focus-visible:outline-none"
+            onClick={() => onPick(example)}
+          >
+            {example}
+          </button>
+        </li>
+      ))}
+    </ul>
   );
 }
