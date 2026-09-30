@@ -78,13 +78,16 @@ def fit(data: dict, max_chars: int) -> str:
     return text if len(text) <= max_chars else text[:max_chars] + "…(truncated)"
 
 
-def cited(sources: list[dict], answer: str) -> list[dict]:
-    """The sources the answer mentions by name, one per name.
+def cited(sources: list[dict], question: str, answer: str) -> list[dict]:
+    """The sources the question or answer mentions by name, one per name.
+
+    The question counts too: "What is Gengar weak to?" can be answered without repeating
+    "Gengar".
 
     Search returns neighbours the model didn't use (Medicham for a Mimikyu question), and an
     entity can arrive both as a Pokédex hit and a get_pokemon result; the sprite wins.
     """
-    text = f" {normalize(answer)} "
+    text = f" {normalize(question)} {normalize(answer)} "
     kept: dict[str, dict] = {}
     for source in sources:
         title = normalize(source["title"])
@@ -141,7 +144,7 @@ class Agent:
                 if not turn.tool_calls or last:
                     if not turn.content:
                         raise RuntimeError("model returned no answer")
-                    yield Event("sources", cited(list(sources.values()), "".join(answer)))
+                    yield Event("sources", cited(list(sources.values()), question, "".join(answer)))
                     done = {"provider": provider, "rounds": round_ + 1}
                     yield Event("done", {**done, "truncated": turn.truncated})
                     return

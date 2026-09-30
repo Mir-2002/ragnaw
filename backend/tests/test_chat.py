@@ -137,8 +137,14 @@ def test_cited_keeps_only_sources_the_answer_names():
         {"title": "Mr. Mime", "kind": "species", "url": "s/122"},
     ]
     answer = "**Mimikyu** hides under a rag. Unlike mr mime, it..."
-    kept = cited(sources, answer)
+    kept = cited(sources, "Tell me about Mimikyu", answer)
     # One Mimikyu card (the one with a sprite); Medicham isn't mentioned.
     assert [s["url"] for s in kept] == ["p/778", "s/122"]
     # Whole names only: "Mew" must not match inside "Mewtwo".
-    assert cited([{"title": "Mew", "kind": "pokemon", "url": "p/151"}], "Mewtwo is strong") == []
+    mew = [{"title": "Mew", "kind": "pokemon", "url": "p/151"}]
+    assert cited(mew, "Who is stronger?", "Mewtwo is strong") == []
+
+
+def test_cited_counts_names_in_the_question():
+    gengar = [{"title": "Gengar", "kind": "pokemon", "url": "p/94"}]
+    assert cited(gengar, "What is Gengar weak to?", "Type: Ghost/Poison. Weak to Dark.") == gengar
