@@ -4,8 +4,8 @@ from pathlib import Path
 
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
-# backend/data, where ingest writes the SQLite DB, vector index and manifest.
-DEFAULT_DATA_DIR = Path(__file__).resolve().parents[2] / "data"
+# backend/ locally, /home/user/app in the Space image.
+APP_ROOT = Path(__file__).resolve().parents[2]
 
 
 @dataclass(frozen=True)
@@ -31,7 +31,10 @@ class Settings(BaseSettings):
     max_question_chars: int = 500
     max_tool_rounds: int = 3
 
-    data_dir: Path = DEFAULT_DATA_DIR
+    # Where ingest writes the SQLite DB, vector index and manifest.
+    data_dir: Path = APP_ROOT / "data"
+    # The Dockerfile downloads the embedding model here at build time.
+    model_cache_dir: Path = APP_ROOT / ".cache" / "models"
 
     @property
     def cors_origin_list(self) -> list[str]:

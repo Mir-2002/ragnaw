@@ -12,6 +12,7 @@ __pycache__/
 
 # Ingest downloads (build output in backend/data/ IS committed)
 ingest/.cache/
+backend/.cache/
 
 # OS / editors
 .DS_Store
