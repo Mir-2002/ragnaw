@@ -1,71 +1,39 @@
-"use client";
+import type { BackendStatus } from "@/hooks/use-backend-status";
+import type { Health } from "@/lib/api";
+import { cn } from "@/lib/utils";
 
-import { useEffect, useState } from "react";
-import { getHealth, type Health } from "@/lib/api";
-
-type Status = "checking" | "waking" | "online" | "offline";
-
-// Free HF Spaces sleep when idle; a cold start can take a minute or more.
-const WAKE_TIMEOUT_MS = 120_000;
-const RETRY_MS = 3_000;
-
-const LABELS: Record<Status, string> = {
+const LABELS: Record<BackendStatus, string> = {
   checking: "Connecting…",
   waking: "Waking up the backend…",
-  online: "Backend online",
+  online: "Online",
   offline: "Backend unreachable",
 };
 
-const DOT: Record<Status, string> = {
-  checking: "bg-zinc-400",
+const DOT: Record<BackendStatus, string> = {
+  checking: "bg-muted-foreground",
   waking: "bg-amber-400 animate-pulse",
   online: "bg-emerald-500",
-  offline: "bg-red-500",
+  offline: "bg-destructive",
 };
 
-export function BackendStatus() {
-  const [status, setStatus] = useState<Status>("checking");
-  const [health, setHealth] = useState<Health | null>(null);
+/** Why questions can't be asked yet, or null when they can. */
+export function unavailableReason(status: BackendStatus, health: Health | null) {
+  if (status === "waking") return "The backend is waking up. This can take up to a minute.";
+  if (status === "offline") return "The backend isn't responding. Try reloading in a minute.";
+  if (status === "checking" || !health) return "Connecting to the backend…";
+  if (!health.data_ready) return "The Pokémon data hasn't been built on the backend.";
+  if (!health.llm_providers.length) return "No LLM provider is configured on the backend.";
+  return null;
+}
 
-  useEffect(() => {
-    let cancelled = false;
-    const started = Date.now();
-
-    async function poll() {
-      while (!cancelled && Date.now() - started < WAKE_TIMEOUT_MS) {
-        const result = await getHealth();
-        if (cancelled) return;
-        if (result) {
-          setHealth(result);
-          setStatus("online");
-          return;
-        }
-        setStatus("waking");
-        await new Promise((resolve) => setTimeout(resolve, RETRY_MS));
-      }
-      if (!cancelled) setStatus("offline");
-    }
-
-    poll();
-    return () => {
-      cancelled = true;
-    };
-  }, []);
-
-  const note =
-    status === "online" && health && !health.data_ready
-      ? "Index not built yet"
-      : status === "waking"
-        ? "This can take up to a minute on the free tier."
-        : null;
-
+export function BackendStatusPill({ status }: { status: BackendStatus }) {
   return (
-    <div className="flex flex-col items-center gap-1 text-sm" aria-live="polite">
-      <span className="inline-flex items-center gap-2 rounded-full border border-zinc-200 px-3 py-1 dark:border-zinc-800">
-        <span className={`size-2 rounded-full ${DOT[status]}`} />
-        {LABELS[status]}
-      </span>
-      {note && <span className="text-zinc-500">{note}</span>}
-    </div>
+    <span
+      className="inline-flex items-center gap-2 rounded-full border px-2.5 py-0.5 text-xs text-muted-foreground"
+      aria-live="polite"
+    >
+      <span className={cn("size-1.5 rounded-full", DOT[status])} />
+      {LABELS[status]}
+    </span>
   );
 }
