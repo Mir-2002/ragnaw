@@ -20,7 +20,12 @@ class ScriptedRouter:
 
     async def stream(self, messages, tools, tool_choice="auto", prefer=None):
         self.calls.append(
-            {"messages": list(messages), "tool_choice": tool_choice, "prefer": prefer}
+            {
+                "messages": list(messages),
+                "tools": tools,
+                "tool_choice": tool_choice,
+                "prefer": prefer,
+            }
         )
         if self.unavailable:
             raise ProvidersUnavailable()

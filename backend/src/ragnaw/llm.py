@@ -121,13 +121,14 @@ class LLMRouter:
                 params: dict[str, Any] = {
                     "model": provider.model,
                     "messages": messages,
-                    "tools": tools,
-                    "tool_choice": tool_choice,
                     "max_tokens": self.max_tokens,
                     # No stream_options={"include_usage": True}: on Gemini's OpenAI
                     # endpoint it ends the stream after the first chunk (seen live).
                     "stream": True,
                 }
+                if tools:
+                    params["tools"] = tools
+                    params["tool_choice"] = tool_choice
                 if provider.reasoning_effort:
                     params["reasoning_effort"] = provider.reasoning_effort
                 if provider.extra_body:

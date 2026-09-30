@@ -22,6 +22,8 @@ from ragnaw.catalog import SORTABLE, Catalog, ResolutionError
 from ragnaw.retrieval import KnowledgeIndex
 
 SEARCH_RESULTS = 5
+# gpt-oss makes one tool call per round, so "compare these three" must fit in one call.
+MAX_LOOKUPS = 6
 MAX_FILTER_RESULTS = 25
 # Kept out of specs; see module docstring.
 SERVER_SIDE_ONLY = {"maximum", "minimum", "maxItems", "minItems", "maxLength", "minLength"}
@@ -41,10 +43,11 @@ class SearchKnowledge(BaseModel):
 
 
 class GetPokemon(BaseModel):
-    """Types, base stats, abilities, forms and a Pokédex entry for one Pokémon or form
-    (e.g. "Pikachu", "Mega Charizard X", "Alolan Raichu")."""
+    """Types, weaknesses, base stats, abilities, forms and a Pokédex entry for up to 6 Pokémon or
+    forms at once (e.g. "Pikachu", "Mega Charizard X", "Alolan Raichu"). Look up every
+    Pokémon the question needs in one call."""
 
-    name: str
+    names: list[str] = Field(min_length=1, max_length=MAX_LOOKUPS)
 
 
 class StatCondition(BaseModel):
@@ -197,14 +200,24 @@ class ToolBox:
         )
 
     def _pokemon(self, args: GetPokemon) -> ToolResult:
-        data = self.catalog.get_pokemon(args.name)
-        source = {
-            "title": data["name"],
-            "kind": "pokemon",
-            "url": f"{POKEAPI}/pokemon/{data.pop('identifier')}",
-            "image": data.pop("sprite_url"),
-        }
-        return ToolResult(data, [source])
+        # One bad name (a typo, an ambiguous form) shouldn't sink the others.
+        results, sources = [], []
+        for name in args.names:
+            try:
+                data = self.catalog.get_pokemon(name)
+            except ResolutionError as e:
+                results.append({"query": name, "error": str(e)})
+                continue
+            sources.append(
+                {
+                    "title": data["name"],
+                    "kind": "pokemon",
+                    "url": f"{POKEAPI}/pokemon/{data.pop('identifier')}",
+                    "image": data.pop("sprite_url"),
+                }
+            )
+            results.append(data)
+        return ToolResult({"results": results}, sources)
 
     @staticmethod
     def _linked(data: dict, kind: str) -> ToolResult:

@@ -103,6 +103,8 @@ async def test_streams_tokens_and_reassembles_fragmented_tool_calls():
     assert call.as_message_part()["extra_content"] == {"google": {"thought_signature": "sig"}}
     assert groq.requests[0]["reasoning_effort"] == "low"
     assert "extra_body" not in groq.requests[0]
+    # No tool definitions means no tools or tool_choice keys at all.
+    assert "tools" not in groq.requests[0] and "tool_choice" not in groq.requests[0]
     assert turn.truncated  # these chunks never send a finish_reason
     # Truncates Gemini streams after one chunk.
     assert "stream_options" not in groq.requests[0]

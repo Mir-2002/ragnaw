@@ -36,12 +36,23 @@ def test_bounds_still_enforced_server_side(tools):
     ],
 )
 def test_get_pokemon_resolves_names(tools, query, expected):
-    assert run(tools, "get_pokemon", name=query)["name"] == expected
+    assert run(tools, "get_pokemon", names=[query])["results"][0]["name"] == expected
 
 
-def test_ambiguous_name_asks_instead_of_guessing(tools):
-    error = run(tools, "get_pokemon", name="mega charizard")["error"]
-    assert "Mega Charizard X" in error and "Mega Charizard Y" in error
+def test_get_pokemon_looks_up_several_at_once(tools):
+    result = tools.run("get_pokemon", json.dumps({"names": ["snivy", "tepig", "oshawot"]}))
+    assert [p["name"] for p in result.data["results"]] == ["Snivy", "Tepig", "Oshawott"]
+    assert [s["title"] for s in result.sources] == ["Snivy", "Tepig", "Oshawott"]
+
+
+def test_one_bad_name_does_not_sink_the_others(tools):
+    results = run(tools, "get_pokemon", names=["pikachu", "mega charizard"])["results"]
+    assert results[0]["name"] == "Pikachu"
+    assert "Mega Charizard X" in results[1]["error"] and "Mega Charizard Y" in results[1]["error"]
+
+
+def test_get_pokemon_caps_the_batch(tools):
+    assert "error" in run(tools, "get_pokemon", names=["pikachu"] * 7)
 
 
 def test_filter_sorts_and_filters(tools):
@@ -124,8 +135,16 @@ def test_bad_calls_return_errors_not_exceptions(tools, name, arguments):
 
 
 def test_sources_stay_out_of_model_data(tools):
-    result = tools.run("get_pokemon", '{"name": "pikachu"}')
+    result = tools.run("get_pokemon", '{"names": ["pikachu"]}')
     assert "sprite_url" not in result.data and "identifier" not in result.data
     (source,) = result.sources
     assert source["url"] == "https://pokeapi.co/api/v2/pokemon/pikachu"
     assert source["image"].endswith("/25.png")
+
+
+def test_get_pokemon_includes_its_weaknesses(tools):
+    (gengar,) = run(tools, "get_pokemon", names=["gengar"])["results"]
+    # Ghost/Poison: Ground is 2x, not 4x (the live model once claimed 4x from memory).
+    assert gengar["damage_taken"]["2x"] == ["Dark", "Ghost", "Ground", "Psychic"]
+    assert "4x" not in gengar["damage_taken"]
+    assert set(gengar["damage_taken"]["immune"]) == {"Normal", "Fighting"}

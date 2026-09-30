@@ -3,13 +3,13 @@ import json
 import pytest
 from fakes import Script, ScriptedRouter
 
-from ragnaw.chat import BUSY_MESSAGE, Agent, cited, fit
+from ragnaw.chat import BUSY_MESSAGE, Agent, cited, fit, status_label
 from ragnaw.llm import ToolCall
 from ragnaw.rate_limit import RateLimiter
 
 
 def lookup(name: str, call_id: str = "call_1") -> ToolCall:
-    return ToolCall(call_id, "get_pokemon", json.dumps({"name": name}))
+    return ToolCall(call_id, "get_pokemon", json.dumps({"names": [name]}))
 
 
 async def events(agent: Agent, question: str = "q") -> list:
@@ -33,7 +33,7 @@ async def test_runs_tools_then_streams_the_answer(tools):
     tool_message = router.calls[1]["messages"][-1]
     assert tool_message["role"] == "tool"
     assert tool_message["tool_call_id"] == "call_1"
-    assert json.loads(tool_message["content"])["name"] == "Pikachu"
+    assert json.loads(tool_message["content"])["results"][0]["name"] == "Pikachu"
     assert router.calls[1]["prefer"] == "fake"
 
 
@@ -45,7 +45,8 @@ async def test_last_round_forbids_tools(tools):
         Script(tokens=["Eevee."], tool_calls=[lookup("eevee", "call_2")]),
     )
     result = await events(Agent(router, tools, max_tool_rounds=1, max_tool_result_chars=6000))
-    assert [c["tool_choice"] for c in router.calls] == ["auto", "none"]
+    # Not tool_choice="none": Groq fails the response if gpt-oss calls a tool anyway.
+    assert [bool(c["tools"]) for c in router.calls] == [True, False]
     assert result[-1] == ("done", {"provider": "fake", "rounds": 2, "truncated": False})
 
 
@@ -148,3 +149,34 @@ def test_cited_keeps_only_sources_the_answer_names():
 def test_cited_counts_names_in_the_question():
     gengar = [{"title": "Gengar", "kind": "pokemon", "url": "p/94"}]
     assert cited(gengar, "What is Gengar weak to?", "Type: Ghost/Poison. Weak to Dark.") == gengar
+
+
+@pytest.mark.parametrize(
+    ("tool", "args", "label"),
+    [
+        (
+            "get_pokemon",
+            {"names": ["snivy", "tepig", "oshawott"]},
+            "Looking up snivy, tepig and oshawott",
+        ),
+        ("get_pokemon", {"names": ["gengar"]}, "Looking up gengar"),
+        ("get_ability", {"name": "levitate"}, "Looking up the ability levitate"),
+        (
+            "get_type_matchups",
+            {"types": ["Water", "Ground"]},
+            "Checking type matchups for Water/Ground",
+        ),
+        ("filter_pokemon", {"ability": "levitate", "generation": 4}, "Filtering Pokémon"),
+        ("search_knowledge", {"query": "cloth"}, "Searching the Pokédex for “cloth”"),
+        ("get_move", "{not json", "Looking up the move "),
+    ],
+)
+def test_status_label_for_every_tool(tool, args, label):
+    # Building one tool's label must not fail on another tool's missing arguments.
+    arguments = args if isinstance(args, str) else json.dumps(args)
+    assert status_label(tool, arguments) == label
+
+
+def test_status_labels_cover_every_tool(tools):
+    for spec in tools.specs:
+        assert status_label(spec["function"]["name"], "{}") != "Thinking"

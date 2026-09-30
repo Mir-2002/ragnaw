@@ -152,6 +152,9 @@ class Catalog:
             "species": p["species"],
             "genus": p["genus"],
             "types": type_label(p["type1"], p["type2"]),
+            # Included so "what is X weak to" is answered from data even when the model
+            # doesn't also call get_type_matchups (seen live: it invented a 4x weakness).
+            "damage_taken": self.damage_taken([t for t in (p["type1"], p["type2"]) if t]),
             "stats": {s: p[s] for s in STATS},
             "base_stat_total": p["base_stat_total"],
             "abilities": abilities,
@@ -226,6 +229,19 @@ class Catalog:
 
     # --- types ---------------------------------------------------------------------
 
+    def damage_taken(self, type_names: list[str]) -> dict[str, list[str]]:
+        """Attacking types grouped by multiplier against these defending types."""
+        defending = [self.type_ids[t] for t in type_names]
+        buckets: dict[str, list[str]] = defaultdict(list)
+        labels = {4.0: "4x", 2.0: "2x", 0.5: "0.5x", 0.25: "0.25x", 0.0: "immune"}
+        for attacker, attacker_id in self.type_ids.items():
+            factor = 1.0
+            for d in defending:
+                factor *= self.efficacy[(attacker_id, d)]
+            if factor != 1.0:
+                buckets[labels[factor]].append(attacker)
+        return {k: sorted(buckets[k]) for k in labels.values() if k in buckets}
+
     def type_matchups(self, types: list[str] | None, pokemon: str | None) -> dict:
         subject = None
         if pokemon:
@@ -235,17 +251,6 @@ class Catalog:
             type_names = [self.types.resolve(t, "type").name for t in types or []]
         if not 1 <= len(type_names) <= 2:
             raise ResolutionError("Give one or two types, or a Pokémon name.")
-
-        defending = [self.type_ids[t] for t in type_names]
-        buckets: dict[str, list[str]] = defaultdict(list)
-        labels = {4.0: "4x", 2.0: "2x", 0.5: "0.5x", 0.25: "0.25x", 0.0: "immune"}
-        order = list(labels.values())
-        for attacker, attacker_id in self.type_ids.items():
-            factor = 1.0
-            for d in defending:
-                factor *= self.efficacy[(attacker_id, d)]
-            if factor != 1.0:
-                buckets[labels[factor]].append(attacker)
 
         offense = {
             t: sorted(
@@ -258,7 +263,7 @@ class Catalog:
         return {
             "pokemon": subject,
             "defending_types": "/".join(type_names),
-            "damage_taken": {k: sorted(buckets[k]) for k in order if k in buckets},
+            "damage_taken": self.damage_taken(type_names),
             "super_effective_against": offense,
             "note": "Type chart only; abilities like Levitate or Flash Fire can change these.",
         }

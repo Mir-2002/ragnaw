@@ -21,8 +21,9 @@ logger = logging.getLogger(__name__)
 SYSTEM_PROMPT = """You are RAGNaw. You answer questions about Pokémon using only your tools, which hold PokeAPI data for every Pokémon, form, move and ability as of the latest games.
 
 Getting the facts:
-- Call a tool for each part of the question. A named Pokémon: get_pokemon, even if misspelled. Lists filtered by type, ability, stats or generation: filter_pokemon with every filter the question mentions. Lore and descriptions: search_knowledge.
+- Call a tool for each part of the question. Named Pokémon: one get_pokemon call with all of their names, even if misspelled. Lists filtered by type, ability, stats or generation: filter_pokemon with every filter the question mentions. Lore and descriptions: search_knowledge.
 - If a tool returns an error, fix the call (e.g. use a suggested name) or say what failed.
+- You may use general knowledge to decide what to look up (e.g. which Pokémon are the Gen 5 starters), since the data doesn't record that. Every fact you state still comes from tool results.
 
 Writing the answer:
 - State only facts found in this conversation's tool results. Leave out anything they don't contain, even if you believe it: no move lists, dates, game mechanics or tips from memory.
@@ -56,10 +57,11 @@ def status_label(tool: str, arguments: str) -> str:
     except json.JSONDecodeError:
         args = {}
     args = args if isinstance(args, dict) else {}
+    names = args.get("names") if isinstance(args.get("names"), list) else []
     name = args.get("name") or args.get("pokemon") or "/".join(args.get("types") or [])
     labels = {
         "search_knowledge": f"Searching the Pokédex for “{args.get('query', '')}”",
-        "get_pokemon": f"Looking up {name}",
+        "get_pokemon": f"Looking up {join(names)}",
         "filter_pokemon": "Filtering Pokémon",
         "get_type_matchups": f"Checking type matchups for {name}",
         "get_evolution_chain": f"Tracing {name}'s evolution line",
@@ -67,6 +69,14 @@ def status_label(tool: str, arguments: str) -> str:
         "get_ability": f"Looking up the ability {name}",
     }
     return labels.get(tool, "Thinking")
+
+
+def join(items: list) -> str:
+    """Snivy, Tepig and Oshawott."""
+    items = [str(i) for i in items]
+    if len(items) < 2:
+        return "".join(items)
+    return f"{', '.join(items[:-1])} and {items[-1]}"
 
 
 def fit(data: dict, max_chars: int) -> str:
@@ -122,13 +132,14 @@ class Agent:
 
         try:
             for round_ in range(self.max_tool_rounds + 1):
-                # The last round forbids tools, so the model has to answer with what it has.
+                # The last round sends no tools, so the model has to answer with what it
+                # has. (tool_choice="none" isn't enough: Groq fails the whole response when
+                # gpt-oss tries a call anyway.)
                 last = round_ == self.max_tool_rounds
                 turn: Turn | None = None
                 async for item in self.router.stream(
                     messages,
-                    self.tools.specs,
-                    tool_choice="none" if last else "auto",
+                    [] if last else self.tools.specs,
                     prefer=provider,
                 ):
                     if isinstance(item, Token):
