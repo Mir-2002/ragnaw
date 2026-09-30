@@ -379,6 +379,16 @@
   .px-sprite {
     image-rendering: pixelated;
   }
+
+  /* A one-step pixel outline in the frame color, like a handheld title logo. It keeps the
+     pale "aw" readable on light frames. */
+  .px-logo {
+    --edge: 2px;
+    filter: drop-shadow(var(--edge) 0 0 var(--frame-outline))
+      drop-shadow(calc(var(--edge) * -1) 0 0 var(--frame-outline))
+      drop-shadow(0 var(--edge) 0 var(--frame-outline))
+      drop-shadow(0 calc(var(--edge) * -1) 0 var(--frame-outline));
+  }
 }
 
 @media (prefers-reduced-motion: reduce) {

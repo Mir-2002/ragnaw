@@ -1,5 +1,6 @@
 "use client";
 
+import Image from "next/image";
 import { useEffect, useRef, useState } from "react";
 import { BackendStatusPill, unavailableReason } from "@/components/backend-status";
 import { AboutDialog, OptionDialog } from "@/components/dialogs";
@@ -126,23 +127,39 @@ export function Chat() {
 
   return (
     <div className="mx-auto flex h-dvh w-full max-w-3xl flex-col gap-3 p-3 sm:p-4">
-      <header className="flex items-start justify-between gap-3">
-        {/* Styled after the location sign that pops up on entering a new area. */}
-        <Frame fillClassName="px-text py-2">
-          <h1 className="px-label text-base leading-none font-bold sm:text-lg">RAGNaw</h1>
-          <p className="px-label mt-1 text-[10px] text-[var(--ink-soft)]">Pokémon answers from PokeAPI data</p>
-        </Frame>
-        <Frame fillClassName="px-text flex items-center gap-3 py-2">
-          <BackendStatusPill status={status} />
-          <StartMenu
-            examples={EXAMPLES}
-            canAsk={canAsk}
-            canClear={!busy && exchanges.length > 0}
-            onAsk={send}
-            onNewChat={() => setExchanges([])}
-            onOption={() => setDialog("option")}
-            onAbout={() => setDialog("about")}
-          />
+      {/* One sign across the top, like the location popup on entering a new area. */}
+      <header>
+        <Frame fillClassName="px-text flex items-center justify-between gap-3 py-2">
+          <div className="min-w-0">
+            <h1 className="leading-none">
+              {/* The letters sit on a 28-unit pixel grid: 21px and 28px tall keep every
+                  edge on a whole screen pixel. */}
+              <Image
+                src="/ragnaw-wordmark.svg"
+                alt="RAGNaw"
+                width={1316}
+                height={196}
+                priority
+                unoptimized
+                className="px-logo h-[21px] w-auto sm:h-7"
+              />
+            </h1>
+            <p className="px-label mt-1.5 truncate text-[10px] text-[var(--ink-soft)]">
+              Pokémon answers from PokeAPI data
+            </p>
+          </div>
+          <div className="flex shrink-0 items-center gap-3">
+            <BackendStatusPill status={status} />
+            <StartMenu
+              examples={EXAMPLES}
+              canAsk={canAsk}
+              canClear={!busy && exchanges.length > 0}
+              onAsk={send}
+              onNewChat={() => setExchanges([])}
+              onOption={() => setDialog("option")}
+              onAbout={() => setDialog("about")}
+            />
+          </div>
         </Frame>
       </header>
 
