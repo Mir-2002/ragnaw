@@ -16,3 +16,10 @@ def test_unconfigured_providers_are_skipped():
     assert [p.name for p in settings.llm_providers] == ["gemini"]
     no_fallback = Settings(_env_file=None, groq_api_key="g", groq_fallback_model="")
     assert [p.name for p in no_fallback.llm_providers] == ["groq"]
+
+
+def test_cors_origins_ignore_trailing_slashes_and_spaces():
+    settings = Settings(
+        _env_file=None, cors_origins=" https://ragnaw.vercel.app/ , http://localhost:3000"
+    )
+    assert settings.cors_origin_list == ["https://ragnaw.vercel.app", "http://localhost:3000"]

@@ -65,7 +65,9 @@ class Settings(BaseSettings):
 
     @property
     def cors_origin_list(self) -> list[str]:
-        return [o.strip() for o in self.cors_origins.split(",") if o.strip()]
+        # Browsers send origins without a trailing slash; copying the URL from an address
+        # bar adds one, and then nothing matches (seen on the first deploy).
+        return [o.strip().rstrip("/") for o in self.cors_origins.split(",") if o.strip()]
 
     @property
     def llm_providers(self) -> list[LLMProvider]:
