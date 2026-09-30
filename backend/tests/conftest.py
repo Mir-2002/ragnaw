@@ -14,3 +14,8 @@ def client():
 @pytest.fixture(scope="session")
 def index(client):
     return client.app.state.index
+
+
+@pytest.fixture(scope="session")
+def tools(client):
+    return client.app.state.tools
